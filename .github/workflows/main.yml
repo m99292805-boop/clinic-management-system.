@@ -31,7 +31,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-          cache: gradle
 
       # 4. إعداد Android SDK
       - name: Setup Android SDK
