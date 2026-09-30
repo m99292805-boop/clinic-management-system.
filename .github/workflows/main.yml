@@ -1,87 +1,99 @@
 name: Build Android APK and AAB
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
-  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
   build-android:
+    name: Build APK and AAB
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      # 1. تحميل المشروع
+      - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 2. إعداد Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
 
+      # 3. إعداد Java المطلوب لـ Android/Gradle
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: '17'
+          cache: gradle
 
-      - name: Check project
-        run: |
-          test -f package.json
-          test -f capacitor.config.json
-          test -f vite.config.js
-          test -f index.html
+      # 4. إعداد Android SDK
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
+      # 5. تثبيت مكتبات المشروع
       - name: Install dependencies
-        run: npm ci
+        run: npm install --no-audit --no-fund
 
-      - name: Create production environment
-        run: |
-          echo "VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}" >> .env.production
-          echo "VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}" >> .env.production
-
-      - name: Build web application
+      # 6. بناء نسخة الويب
+      - name: Build Vite application
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: npm run build
 
-      - name: Verify web build
+      # 7. إنشاء مشروع Android الخاص بـ Capacitor
+      - name: Add Android platform
         run: |
-          test -d dist
-          test -f dist/index.html
+          if [ ! -d "android" ]; then
+            npx cap add android
+          fi
 
-      - name: Add Android
-        run: npx cap add android
-
-      - name: Generate Android assets
-        run: npx capacitor-assets generate --android
-
+      # 8. مزامنة ملفات الويب مع Android
       - name: Sync Capacitor
         run: npx cap sync android
 
+      # 9. صلاحية تشغيل Gradle
       - name: Make Gradle executable
         run: chmod +x android/gradlew
 
+      # 10. بناء APK قابل للتثبيت
       - name: Build Debug APK
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
 
-      - name: Upload Debug APK
+      # 11. بناء AAB للنشر على Google Play
+      - name: Build Release AAB
+        working-directory: android
+        run: ./gradlew bundleRelease --no-daemon
+
+      # 12. رفع APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: clinic-management-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
-      - name: Build Release AAB
-        working-directory: android
-        run: ./gradlew bundleRelease --no-daemon
-
-      - name: Upload Release AAB
+      # 13. رفع AAB
+      - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
           name: clinic-management-release-aab
           path: android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
+
+      # 14. رفع نسخة إضافية من معلومات البناء
+      - name: Show generated files
+        run: |
+          echo "===== APK ====="
+          ls -lh android/app/build/outputs/apk/debug/ || true
+
+          echo "===== AAB ====="
+          ls -lh android/app/build/outputs/bundle/release/ || true
