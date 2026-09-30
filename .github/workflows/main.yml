@@ -35,44 +35,53 @@ jobs:
       # 4. إعداد Android SDK
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: |
+            platform-tools
+            platforms;android-35
+            build-tools;35.0.0
 
-      # 5. تثبيت مكتبات المشروع
+      # 5. قبول رخص Android SDK
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses > /dev/null || true
+
+      # 6. تثبيت مكتبات المشروع
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
-      # 6. بناء نسخة الويب
+      # 7. بناء نسخة الويب
       - name: Build Vite application
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: npm run build
 
-      # 7. إنشاء مشروع Android الخاص بـ Capacitor
+      # 8. إنشاء مشروع Android الخاص بـ Capacitor
       - name: Add Android platform
         run: |
           if [ ! -d "android" ]; then
             npx cap add android
           fi
 
-      # 8. مزامنة ملفات الويب مع Android
+      # 9. مزامنة ملفات الويب مع Android
       - name: Sync Capacitor
         run: npx cap sync android
 
-      # 9. صلاحية تشغيل Gradle
+      # 10. صلاحية تشغيل Gradle
       - name: Make Gradle executable
         run: chmod +x android/gradlew
 
-      # 10. بناء APK قابل للتثبيت
+      # 11. بناء APK قابل للتثبيت
       - name: Build Debug APK
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
 
-      # 11. بناء AAB للنشر على Google Play
+      # 12. بناء AAB للنشر على Google Play
       - name: Build Release AAB
         working-directory: android
         run: ./gradlew bundleRelease --no-daemon
 
-      # 12. رفع APK
+      # 13. رفع APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
@@ -80,7 +89,7 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
-      # 13. رفع AAB
+      # 14. رفع AAB
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
@@ -88,7 +97,7 @@ jobs:
           path: android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
 
-      # 14. رفع نسخة إضافية من معلومات البناء
+      # 15. رفع نسخة إضافية من معلومات البناء
       - name: Show generated files
         run: |
           echo "===== APK ====="
